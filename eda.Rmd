@@ -2,7 +2,9 @@
 title: "Ginger EDA"
 author: "Matthew Cui"
 date: "10/8/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -25,11 +27,11 @@ coach <- read_csv("coach_data.csv") %>%
 counts <- coach %>% 
   group_by(week_of_service) %>% 
   count(num_msg) %>% 
-  mutate(total = sum(n * num_msg)) %>% 
-  distinct(total)
+  mutate(total_msg = sum(n * num_msg)) %>% 
+  distinct(total_msg)
 counts
 
-ggplot(counts, aes(x = week_of_service, y = total)) +
+ggplot(counts, aes(x = week_of_service, y = total_msg)) +
   geom_point() +
   geom_text(aes(label= ifelse(week_of_service == 117,
                              as.character(week_of_service), "")), 
@@ -47,10 +49,30 @@ actives <- coach %>%
   arrange(desc(total))
 actives
 
-top10 <- actives %>% 
-  head(10) %>% 
+top5_member <- actives %>% 
+  head(5) %>% 
   pull(hashed_member_id)
 
-ggplot(actives, aes(y = total, x = hashed_member_id)) +
-  geom_point()
+ggplot(actives, aes(x = total)) +
+  geom_histogram(binwidth = 20, aes(fill = "e3a42c")) + 
+  theme(legend.position = "none")
+
+actives %>% 
+  filter(total < 300) %>% 
+  ggplot(aes(x = total)) +
+    geom_histogram(binwidth = 5, aes(fill = "e3a42c")) +
+    theme(legend.position = "none") 
+```
+
+```{r}
+top5_activity <- coach %>% 
+  filter(hashed_member_id %in% top5_member) %>% 
+  arrange(desc(num_msg))
+
+ggplot(top5_activity, aes(x = week_of_service, y = num_msg)) +
+  geom_col(aes(fill = hashed_member_id)) +
+  theme(legend.position = "none") +
+  scale_fill_brewer(palette = "YlOrBr")
+
+
 ```

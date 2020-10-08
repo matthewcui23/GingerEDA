@@ -1,0 +1,56 @@
+---
+title: "Ginger EDA"
+author: "Matthew Cui"
+date: "10/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+coach <- read_csv("coach_data.csv") %>% 
+  rename(num_msg = `Number of messages per week`)
+```
+
+```{r}
+counts <- coach %>% 
+  group_by(week_of_service) %>% 
+  count(num_msg) %>% 
+  mutate(total = sum(n * num_msg)) %>% 
+  distinct(total)
+counts
+
+ggplot(counts, aes(x = week_of_service, y = total)) +
+  geom_point() +
+  geom_text(aes(label= ifelse(week_of_service == 117,
+                             as.character(week_of_service), "")), 
+                nudge_x = 3, 
+                color = "red")
+```
+
+
+```{r}
+actives <- coach %>% 
+  group_by(hashed_member_id) %>% 
+  count(num_msg) %>% 
+  mutate(total = sum(n * num_msg)) %>% 
+  distinct(total) %>% 
+  arrange(desc(total))
+actives
+
+top10 <- actives %>% 
+  head(10) %>% 
+  pull(hashed_member_id)
+
+ggplot(actives, aes(y = total, x = hashed_member_id)) +
+  geom_point()
+```

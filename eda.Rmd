@@ -49,19 +49,25 @@ actives <- coach %>%
   arrange(desc(total))
 actives
 
+actives %>% 
+  filter()
+
 top5_member <- actives %>% 
   head(5) %>% 
   pull(hashed_member_id)
 
 ggplot(actives, aes(x = total)) +
   geom_histogram(binwidth = 20, aes(fill = "e3a42c")) + 
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  labs(title = "Histogram of total user messages")
 
 actives %>% 
   filter(total < 300) %>% 
   ggplot(aes(x = total)) +
     geom_histogram(binwidth = 5, aes(fill = "e3a42c")) +
-    theme(legend.position = "none") 
+    theme(legend.position = "none")  +
+    labs(title = "Histogram of total user messages",
+         subtitle = "Filtered for total < 300")
 ```
 
 ```{r}
@@ -72,7 +78,70 @@ top5_activity <- coach %>%
 ggplot(top5_activity, aes(x = week_of_service, y = num_msg)) +
   geom_col(aes(fill = hashed_member_id)) +
   theme(legend.position = "none") +
-  scale_fill_brewer(palette = "YlOrBr")
+  scale_fill_brewer(palette = "YlOrBr") +
+  labs(title = "Distribution of top 5 users' activity over time")
 
 
+```
+
+```{r}
+unique <- coach %>% 
+  group_by(week_of_service) %>% 
+  summarise(n_distinct(hashed_member_id)) %>% 
+  rename(unique_users = "n_distinct(hashed_member_id)")
+
+ggplot(unique, aes(x = week_of_service, y = unique_users)) +
+  geom_point() +
+  labs(title = "Steady increase in unique users per week")
+  
+```
+
+## Meeting on Sunday, October 25th
+
+```{r lifetime}
+new_users <- coach %>% 
+  group_by(hashed_member_id) %>% 
+  filter(week_of_service == min(week_of_service)) %>% 
+  slice(1) %>% 
+  ungroup()
+new_users
+
+ggplot(new_users, aes(x = week_of_service)) +
+  geom_bar() +
+  labs(title = "Distribution of new users every week")
+
+week_joined <- new_users %>% 
+  select(hashed_member_id, week_of_service) %>% 
+  rename(week_joined = week_of_service)
+
+lifetime <- coach %>% 
+  inner_join(week_joined, by = "hashed_member_id") %>% 
+  mutate(cum_weeks = week_of_service - week_joined)
+
+lifetime_count <- lifetime %>% 
+  group_by(cum_weeks) %>% 
+  count(num_msg) %>% 
+  mutate(total_msg = sum(n * num_msg)) %>% 
+  distinct(total_msg)
+
+ggplot(lifetime_count, aes(x = cum_weeks, y = total_msg)) +
+  geom_col() +
+  labs(title = "Distribution of total messages by user lifetime")
+
+ggplot(lifetime_count, aes(x = cum_weeks, y = log(total_msg))) +
+  geom_col() +
+  labs(title = "Distribution of log-transformed total messages")
+
+(average_span <- lifetime %>% 
+  summarise(avg_span = mean(cum_weeks)))
+```
+
+```{r week-112}
+counts %>% 
+  arrange(desc(total_msg)) %>% 
+  head(5)
+
+lifetime %>% 
+  filter(week_of_service == 112) %>% #610 users present in this week
+  summarise(span = mean(cum_weeks))
 ```

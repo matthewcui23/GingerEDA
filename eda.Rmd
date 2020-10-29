@@ -21,6 +21,8 @@ When you click the **Knit** button a document will be generated that includes bo
 ```{r}
 coach <- read_csv("coach_data.csv") %>% 
   rename(num_msg = `Number of messages per week`)
+
+clinic <- read_csv("clinical_data.csv")
 ```
 
 ```{r}
@@ -49,12 +51,12 @@ actives <- coach %>%
   arrange(desc(total))
 actives
 
-actives %>% 
-  filter()
-
 top5_member <- actives %>% 
   head(5) %>% 
   pull(hashed_member_id)
+
+top10_member <- actives %>% 
+  head(10)
 
 ggplot(actives, aes(x = total)) +
   geom_histogram(binwidth = 20, aes(fill = "e3a42c")) + 
@@ -132,6 +134,20 @@ ggplot(lifetime_count, aes(x = cum_weeks, y = log(total_msg))) +
   geom_col() +
   labs(title = "Distribution of log-transformed total messages")
 
+top5_lifetime <- lifetime %>% 
+  filter(hashed_member_id %in% top5_member)
+
+ggplot(top5_lifetime, aes(x = cum_weeks, y = num_msg)) +
+  geom_point(aes(color = hashed_member_id)) +
+  theme(legend.position = "none") +
+  scale_color_brewer(palette = "YlOrBr")
+
+ggplot(top5_lifetime, aes(x = cum_weeks, y = num_msg)) +
+  geom_col(aes(fill = hashed_member_id)) +
+  scale_fill_brewer(palette = "YlOrBr") +
+  theme(legend.position = "none")
+  
+
 (average_span <- lifetime %>% 
   summarise(avg_span = mean(cum_weeks)))
 ```
@@ -144,4 +160,36 @@ counts %>%
 lifetime %>% 
   filter(week_of_service == 112) %>% #610 users present in this week
   summarise(span = mean(cum_weeks))
+```
+
+```{r clinician}
+clinic_lifetime <- clinic %>% 
+  inner_join(week_joined, by = "hashed_member_id") %>% 
+  mutate(cum_weeks = week_of_service - week_joined)
+
+clinic_actives <- clinic %>% 
+  group_by(hashed_member_id) %>% 
+  count(num_ginger_visits) %>% 
+  mutate(total = sum(n * num_ginger_visits)) %>% 
+  distinct(total) %>% 
+  arrange(desc(total))
+clinic_actives
+
+top5_clinic_active <- clinic_actives %>% 
+  head(5) %>% 
+  pull(hashed_member_id)
+
+top5_clinic_lifetime <- clinic_lifetime %>% 
+  filter(hashed_member_id %in% top5_clinic_active)
+
+
+ggplot(top5_clinic_lifetime, aes(x = cum_weeks, y = cumsum(num_ginger_visits))) +
+  geom_line(aes(color = hashed_member_id)) +
+  geom_point(aes(color = hashed_member_id)) +
+  theme(legend.position = "none")
+
+top5_clinic_active <- clinic_actives %>% 
+  head(5) 
+top10_clinic_active
+
 ```

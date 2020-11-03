@@ -126,14 +126,30 @@ lifetime_count <- lifetime %>%
   mutate(total_msg = sum(n * num_msg)) %>% 
   distinct(total_msg)
 
+```
+
+```{r}
 ggplot(lifetime_count, aes(x = cum_weeks, y = total_msg)) +
   geom_col() +
-  labs(title = "Distribution of total messages by user lifetime")
+  labs(title = "Distribution of total messages by user lifetime",
+       y = "Total number of messages",
+       x = "Cumulative weeks") 
 
 ggplot(lifetime_count, aes(x = cum_weeks, y = log(total_msg))) +
-  geom_col() +
-  labs(title = "Distribution of log-transformed total messages")
+  geom_col() +  
+  geom_smooth(method = "lm", aes(colour = "grey70")) +
+  labs(title = "Distribution of log-transformed total messages",
+       y = "Log(Total number of messages)",
+       x = "Cumulative weeks") +
+  theme(legend.position = "none")
 
+
+lm_model <- lm(data = lifetime_count, log(total_msg) ~ cum_weeks)
+tidy(lm_model) %>% 
+  kable(digits = 3)
+```
+
+```{r}
 top5_lifetime <- lifetime %>% 
   filter(hashed_member_id %in% top5_member)
 
@@ -145,7 +161,10 @@ ggplot(top5_lifetime, aes(x = cum_weeks, y = num_msg)) +
 ggplot(top5_lifetime, aes(x = cum_weeks, y = num_msg)) +
   geom_col(aes(fill = hashed_member_id)) +
   scale_fill_brewer(palette = "YlOrBr") +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  labs(title = "Top 5 User Activity Over Lifetime",
+       y = "Number of messages",
+       x = "Cumulative weeks")
   
 
 (average_span <- lifetime %>% 
@@ -163,10 +182,24 @@ lifetime %>%
 ```
 
 ```{r clinician}
-clinic_lifetime <- clinic %>% 
-  inner_join(week_joined, by = "hashed_member_id") %>% 
-  mutate(cum_weeks = week_of_service - week_joined)
+new_users_clinic <- clinic %>% 
+  group_by(hashed_member_id) %>% 
+  filter(week_of_service == min(week_of_service)) %>% 
+  slice(1) %>% 
+  ungroup()
 
+week_joined_clinic <- new_users_clinic %>% 
+  select(hashed_member_id, week_of_service) %>% 
+  rename(week_joined = week_of_service)
+
+
+clinic_lifetime <- clinic %>% 
+  inner_join(week_joined_clinic, by = "hashed_member_id") %>% 
+  mutate(cum_weeks = week_of_service - week_joined)
+```
+
+
+```{r}
 clinic_actives <- clinic %>% 
   group_by(hashed_member_id) %>% 
   count(num_ginger_visits) %>% 
@@ -179,17 +212,51 @@ top5_clinic_active <- clinic_actives %>%
   head(5) %>% 
   pull(hashed_member_id)
 
-top5_clinic_lifetime <- clinic_lifetime %>% 
+top5_clinic_lifetime_coach <- clinic_lifetime %>% 
+  filter(hashed_member_id %in% top5_member)
+
+top5_clinic_lifetime_clinic <- clinic_lifetime %>% 
   filter(hashed_member_id %in% top5_clinic_active)
 
 
-ggplot(top5_clinic_lifetime, aes(x = cum_weeks, y = cumsum(num_ginger_visits))) +
-  geom_line(aes(color = hashed_member_id)) +
-  geom_point(aes(color = hashed_member_id)) +
-  theme(legend.position = "none")
+a <- ggplot(top5_clinic_lifetime_coach, aes(x = cum_weeks, y = num_ginger_visits)) +
+  geom_col() +
+  theme(legend.position = "none") +
+  labs(title = "Top 5 Actives in Coach Data")
+
+b <- ggplot(top5_clinic_lifetime_clinic, aes(x = cum_weeks, y = num_ginger_visits)) +
+  geom_col() +
+  theme(legend.position = "none") +
+  labs(title = "Top 5 Actives in Clinical Data")
+
+a + b
 
 top5_clinic_active <- clinic_actives %>% 
-  head(5) 
-top10_clinic_active
+  head(5) %>% 
+  pull(hashed_member_id)
+top5_clinic_active
 
+```
+
+```{r table-of-comparison}
+top_both_coach <- lifetime %>% 
+  filter(hashed_member_id %in% top5_clinic_active | hashed_member_id %in% top5_member) %>% 
+  select(hashed_member_id, cum_weeks, num_msg, week_joined)
+
+top_both_clinic <- clinic_lifetime %>% 
+  filter(hashed_member_id %in% top5_clinic_active | hashed_member_id %in% top5_member) %>% 
+  select(hashed_member_id, cum_weeks, num_ginger_visits, week_joined)
+
+comparison <- top_both_clinic %>% 
+  inner_join(top_both_coach, by = "hashed_member_id")
+
+all_join <- week_joined_clinic %>% 
+  inner_join(week_joined, by = "hashed_member_id") %>% 
+  mutate(time_taken = week_joined.x - week_joined.y) %>% 
+  select(hashed_member_id, time_taken)
+
+all_join
+
+comparison #what's the question to be asked here?
+#how long does it take for coached patients to join clinic? (every member id)
 ```

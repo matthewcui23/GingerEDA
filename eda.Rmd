@@ -145,8 +145,7 @@ ggplot(lifetime_count, aes(x = cum_weeks, y = log(total_msg))) +
 
 
 lm_model <- lm(data = lifetime_count, log(total_msg) ~ cum_weeks)
-tidy(lm_model) %>% 
-  kable(digits = 3)
+tidy(lm_model)
 ```
 
 ```{r}
@@ -167,8 +166,22 @@ ggplot(top5_lifetime, aes(x = cum_weeks, y = num_msg)) +
        x = "Cumulative weeks")
   
 
-(average_span <- lifetime %>% 
-  summarise(avg_span = mean(cum_weeks)))
+spanning <- lifetime %>% 
+  group_by(hashed_member_id) %>% 
+  filter(cum_weeks == max(cum_weeks)) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  rename(total_weeks = cum_weeks)
+
+spanning
+
+spanning %>% 
+  summarise(mean = mean(total_weeks))
+
+spanning %>% 
+  filter(hashed_member_id %in% top5_member) %>% 
+  summarise(mean = mean(total_weeks))
+ 
 ```
 
 ```{r week-112}

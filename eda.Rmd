@@ -232,17 +232,17 @@ top5_clinic_lifetime_clinic <- clinic_lifetime %>%
   filter(hashed_member_id %in% top5_clinic_active)
 
 
-a <- ggplot(top5_clinic_lifetime_coach, aes(x = cum_weeks, y = num_ginger_visits)) +
-  geom_col() +
-  theme(legend.position = "none") +
-  labs(title = "Top 5 Actives in Coach Data")
-
-b <- ggplot(top5_clinic_lifetime_clinic, aes(x = cum_weeks, y = num_ginger_visits)) +
-  geom_col() +
-  theme(legend.position = "none") +
-  labs(title = "Top 5 Actives in Clinical Data")
-
-a + b
+# a <- ggplot(top5_clinic_lifetime_coach, aes(x = cum_weeks, y = num_ginger_visits)) +
+#   geom_col() +
+#   theme(legend.position = "none") +
+#   labs(title = "Top 5 Actives in Coach Data")
+# 
+# b <- ggplot(top5_clinic_lifetime_clinic, aes(x = cum_weeks, y = num_ginger_visits)) +
+#   geom_col() +
+#   theme(legend.position = "none") +
+#   labs(title = "Top 5 Actives in Clinical Data")
+# 
+# a + b
 
 top5_clinic_active <- clinic_actives %>% 
   head(5) %>% 
@@ -265,11 +265,74 @@ comparison <- top_both_clinic %>%
 
 all_join <- week_joined_clinic %>% 
   inner_join(week_joined, by = "hashed_member_id") %>% 
-  mutate(time_taken = week_joined.x - week_joined.y) %>% 
-  select(hashed_member_id, time_taken)
+  mutate(time_taken = week_joined.x - week_joined.y) %>%#clinic
+  #select(hashed_member_id, time_taken) %>% 
+  mutate(which_first = case_when(time_taken > 0 ~ "Coaching",
+                                 time_taken < 0 ~ "Clinic")) %>% 
+  replace_na(list(which_first = "Same time"))
 
 all_join
 
 comparison #what's the question to be asked here?
 #how long does it take for coached patients to join clinic? (every member id)
+```
+
+```{r}
+all_join %>% 
+  group_by(which_first) %>% 
+  summarise(mean_weeksToSwtich = round(mean(abs(time_taken)), digits = 2)) %>% 
+  filter(which_first != "Same time") %>% 
+  kable()
+
+all_join %>% 
+  group_by(which_first) %>% 
+  count(which_first) %>% 
+  rename(count = n) %>% 
+  kable()
+
+spanning_clinic <- clinic_lifetime %>% 
+  group_by(hashed_member_id) %>% 
+  filter(cum_weeks == max(cum_weeks)) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  rename(total_weeks = cum_weeks)
+
+spanning_clinic %>% 
+  summarise(mean = mean(total_weeks))
+
+spanning_clinic %>% 
+  filter(hashed_member_id %in% top5_clinic_active) %>% 
+  summarise(mean = mean(total_weeks))
+
+spanning_clinic %>% 
+  summarise(q1_clinic = quantile(total_weeks, probs = 0.25),
+            q3_clinic = quantile(total_weeks, probs = 0.75))
+
+spanning %>% 
+  summarise(q1_coach = quantile(total_weeks, probs = 0.25),
+            q3_coach = quantile(total_weeks, probs = 0.75))
+
+```
+
+
+# Meeting on Monday, December 1st
+
+```{r}
+#clinician retention rates
+
+  #arrange(desc(total))
+
+each_clincian <- clinic_lifetime %>% 
+  group_by(hashed_clincian_id) %>% 
+  count()
+
+stat_clinician <- clinic_lifetime %>% 
+  inner_join(each_clincian, by = "hashed_clincian_id") %>% 
+  group_by(hashed_clincian_id) %>% 
+  summarise(total_visits = sum(num_ginger_visits),
+            mean_visits = mean(num_ginger_visits),
+            max_weeks = max(cum_weeks),
+            average_treatment = mean(cum_weeks),
+            psych_count = sum(provider_type == "psych"),
+            thera_count = sum(provider_type == "thera"))
 ```

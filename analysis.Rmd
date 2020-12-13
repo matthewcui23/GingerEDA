@@ -1,0 +1,77 @@
+---
+title: "Clinicial Analysis"
+author: "Matthew Cui"
+date: "12/6/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(zoo)
+library(runner)
+```
+
+In the end, I decided to continue exploring some trends in *activity*, but this time more on the clinician side. 
+
+```{r}
+each_clincian <- clinic_lifetime %>% 
+  group_by(hashed_clincian_id) %>% 
+  count()
+
+stat_clinician <- clinic_lifetime %>% 
+  inner_join(each_clincian, by = "hashed_clincian_id") %>% 
+  group_by(hashed_clincian_id) %>% 
+  summarise(total_visits = sum(num_ginger_visits),
+            mean_visits = mean(num_ginger_visits),
+            max_weeks = max(cum_weeks),
+            average_treatment_time = mean(cum_weeks),
+            psych_count = sum(provider_type == "psych"),
+            thera_count = sum(provider_type == "thera")) %>% 
+  mutate(psych_cent = psych_count - mean(psych_count),
+         thera_cent = thera_count - mean(thera_count),
+         visits_cent = mean_visits - mean(mean_visits)) %>% 
+  mutate(psych_prop = psych_count / total_visits)
+stat_clinician
+
+ggplot(stat_clinician, aes(x = total_visits, y = average_treatment_time)) +
+  geom_point(aes(color = psych_prop)) +
+  scale_fill_gradient(low = "red", high = "yellow")
+
+model <- lm(data = stat_clinician, average_treatment_time ~ psych_cent + thera_cent)
+tidy(model)
+```
+
+
+```{r}
+clinic_coach <- clinic_lifetime %>% 
+  inner_join(lifetime, by = c("hashed_member_id", "week_of_service")) %>% 
+  rename(week_joined_clinic = week_joined.x,
+         cum_weeks_clinic = cum_weeks.x,
+         week_joined_coach = week_joined.y,
+         cum_weeks_coach = cum_weeks.y) %>% 
+  select(-X1.x, -X1.y) %>% 
+  mutate(which_first = case_when(week_joined_coach > week_joined_clinic ~ "coach",
+                                 week_joined_coach < week_joined_clinic ~ "clinic",
+                                 week_joined_coach == week_joined_clinic ~ "same"))
+clinic_coach
+
+clinic_coach %>% 
+  group_by(which_first) %>% 
+  filter(which_first != "same") %>% 
+  summarise(mean_msg = mean(num_msg),
+            mean_visits = mean(num_ginger_visits)) %>% 
+  mutate(msg_per_visit = mean_msg / mean_visits)
+
+clinic_coach %>% 
+  group_by(which_first, provider_type) %>% 
+  filter(which_first != "same") %>% 
+  summarise(mean_msg = mean(num_msg),
+            mean_visits = mean(num_ginger_visits)) %>% 
+  mutate(msg_per_visit = mean_msg / mean_visits)
+```
+Switch from thera to psych, what time
+
+```{r}
+clinic_coach %>% 
+  filter(which_first == "coach")
+```

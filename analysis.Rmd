@@ -11,6 +11,34 @@ library(zoo)
 library(runner)
 ```
 
+```{r}
+gad <- read_csv("gad7_df.csv")
+phq <- read_csv("phq9_df.csv")
+```
+
+```{r}
+gad_scores <- gad %>% 
+  mutate_if(is.logical, as.double) %>% 
+  select(-hashed_clinician_id)
+
+gad_avg <- rowMeans(gad_scores, na.rm = TRUE)
+
+gad <- gad %>% 
+  cbind(gad_avg) %>% 
+  select(hashed_clinician_id, gad_avg) %>% 
+  rename(hashed_clincian_id = hashed_clinician_id)
+
+phq_scores <- phq %>%
+  mutate_if(is.logical, as.double) %>%
+  select(-hashed_clinician_id)
+phq_avg <- rowMeans(phq_scores, na.rm = TRUE)
+
+phq <- phq %>%
+  cbind(phq_avg) %>%
+  select(hashed_clinician_id, phq_avg) %>% 
+  rename(hashed_clincian_id = hashed_clinician_id)
+```
+
 In the end, I decided to continue exploring some trends in *activity*, but this time more on the clinician side. 
 
 ```{r}
@@ -20,6 +48,8 @@ each_clincian <- clinic_lifetime %>%
 
 stat_clinician <- clinic_lifetime %>% 
   inner_join(each_clincian, by = "hashed_clincian_id") %>% 
+  inner_join(phq, by = "hashed_clincian_id") %>% 
+  inner_join(gad, by = "hashed_clincian_id") %>% 
   group_by(hashed_clincian_id) %>% 
   summarise(total_visits = sum(num_ginger_visits),
             mean_visits = mean(num_ginger_visits),
@@ -30,15 +60,18 @@ stat_clinician <- clinic_lifetime %>%
   mutate(psych_cent = psych_count - mean(psych_count),
          thera_cent = thera_count - mean(thera_count),
          visits_cent = mean_visits - mean(mean_visits)) %>% 
-  mutate(psych_prop = psych_count / total_visits)
+  cbind(phq_avg, gad_avg)
 stat_clinician
+```
+
+```{r fig.width = 12, fig.height = 6}
+ggplot(stat_clinician, aes(x = total_visits, y = average_treatment_time)) +
+  geom_point(aes(color = phq_avg)) + 
+  scale_color_gradient(low="grey", high="red") +
 
 ggplot(stat_clinician, aes(x = total_visits, y = average_treatment_time)) +
-  geom_point(aes(color = psych_prop)) +
-  scale_fill_gradient(low = "red", high = "yellow")
-
-model <- lm(data = stat_clinician, average_treatment_time ~ psych_cent + thera_cent)
-tidy(model)
+  geom_point(aes(color = gad_avg)) + 
+  scale_color_gradient(low = "grey", high = "red")
 ```
 
 
@@ -69,9 +102,42 @@ clinic_coach %>%
             mean_visits = mean(num_ginger_visits)) %>% 
   mutate(msg_per_visit = mean_msg / mean_visits)
 ```
+
+```{r}
+b_clients <- clinic_lifetime %>% 
+  filter(hashed_clincian_id == "ad8127758695679fb3139803d014b0a481033a717cf26f4aa7488553850b1aec") %>% 
+  count(hashed_member_id) %>% 
+  pull(hashed_member_id)
+
+a_clients <- clinic_lifetime %>% 
+  filter(hashed_clincian_id == "61ca6c8a4a3c94f3d5f86e9f4310dc7d2d9976536fe4e07d446091c285b17b59") %>%   #196 clients
+  count(hashed_member_id) %>% 
+  pull(hashed_member_id)
+```
+
 Switch from thera to psych, what time
 
 ```{r}
-clinic_coach %>% 
-  filter(which_first == "coach")
+ab_lifetime <- lifetime %>% 
+  filter(hashed_member_id %in% b_clients | hashed_member_id %in% a_clients) %>% 
+  mutate(clinician = case_when(hashed_member_id %in% b_clients ~ "B",
+                               hashed_member_id %in% a_clients ~ "A"))
+ggplot(ab_lifetime, aes(x = clinician, y = num_msg)) + 
+  geom_boxplot() +
+  labs(title = "Effective clinicians' patients behave differently in messaging")
+```
+
+```{r}
+zz <- clinic_coach %>% 
+  group_by(hashed_clincian_id,) %>% 
+  mutate(sum_msg = sum(num_msg)) %>% 
+  arrange(desc(sum_msg)) %>% 
+  ungroup() %>% 
+  distinct(hashed_clincian_id, sum_msg) %>% 
+  inner_join(phq, by = "hashed_clincian_id")
+
+ggplot(zz, aes(x = sum_msg, y = phq_avg)) + 
+  geom_point(aes(color = "hashed_clincian_id")) +
+  
+  labs(title = "No significant correlation between engagement in messaging and clinician\neffectiveness overall")
 ```
